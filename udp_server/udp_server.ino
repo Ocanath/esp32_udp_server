@@ -52,12 +52,15 @@ void loop() {
       Serial.write("Received: ");
       Serial.write((const char *)udp_pkt_buf);
       Serial.write("\r\n");
-      for(int i = 0; i < len; i++)
-        udp_pkt_buf[i] = 0;
 
       udp.beginPacket(udp.remoteIP(), udp.remotePort());
-      udp.printf("received: %s\r\n", udp_pkt_buf);
+      udp.printf("received: ");
+      udp.printf((const char *)udp_pkt_buf);
+      udp.printf("\r\n");
       udp.endPacket();
+
+      for(int i = 0; i < len; i++)
+        udp_pkt_buf[i] = 0;
     }
 
     get_console_lines();
