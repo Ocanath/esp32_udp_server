@@ -13,6 +13,19 @@ void setup() {
   //fuck you
 }
 
+int cmd_match(const char * in, const char * cmd)
+{
+  int i = 0;
+  for(i = 0; cmd[i] != '\0'; i++)
+  {
+    if(in[i] == '\0')
+      return -1;
+    if(in[i] != cmd[i])
+      return -1;   
+  }
+  return i;
+}
+
 void loop() {  
   /*Do a power on blink pattern*/
   pinMode(2,OUTPUT);
@@ -77,10 +90,9 @@ void loop() {
 
       /*Parse the command to get the local IP and connection status*/
       cmp = strcmp((const char *)gl_console_cmd.buf,"ipconfig\r");
-      if(cmp >= 0)
+      if(cmp == 0)
       {
         match = 1;
-        Serial.printf("IP address is: %s\r\n", WiFi.localIP().toString().c_str());
         if(WiFi.status() != 0)
         {
           Serial.printf("Connected to: %s\r\n", ssid);
@@ -89,65 +101,68 @@ void loop() {
         {
           Serial.printf("Not connected to: %s\r\n", ssid);
         }
+        Serial.printf("UDP server on port: %d\r\n", udp_port);
+        Serial.printf("IP address is: %s\r\n", WiFi.localIP().toString().c_str());
       }
 
       /*Parse the command to get UDP server access port*/
-      cmp = strcmp((const char *)gl_console_cmd.buf,"udpconfig\r");
-      if(cmp >= 0)
+      cmp = cmd_match((const char *)gl_console_cmd.buf,"udpconfig\r");
+      if(cmp > 0)
       {
         match = 1;
         Serial.printf("UDP server on port: %d\r\n", udp_port);
       }
       
       /*Parse ssid command*/
-      cmp = strcmp((const char *)gl_console_cmd.buf,"setssid ");
+      cmp = cmd_match((const char *)gl_console_cmd.buf,"setssid ");
       if(cmp > 0)
       {
         match = 1;
         const char * arg = (const char *)(&gl_console_cmd.buf[cmp]);
-        Serial.printf("Changing ssid to: %s",arg);
+        Serial.printf("Changing ssid to: %s\r\n",arg);
         /*Set the ssid*/
 
       }
 
       /*Parse password command*/
-      cmp = strcmp((const char *)gl_console_cmd.buf,"setpwd ");
+      cmp = cmd_match((const char *)gl_console_cmd.buf,"setpwd ");
       if(cmp > 0)
       {
         match = 1;
         const char * arg = (const char *)(&gl_console_cmd.buf[cmp]);
-        Serial.printf("Changing pwd to: %s",arg);
+        Serial.printf("Changing pwd to: %s\r\n",arg);
         /*Set the password*/
       }
 
       /*Parse set port command*/
-      cmp = strcmp((const char *)gl_console_cmd.buf,"setport ");
+      cmp = cmd_match((const char *)gl_console_cmd.buf,"setport ");
       if(cmp > 0)
       {
         match = 1;
         const char * arg = (const char *)(&gl_console_cmd.buf[cmp]);
-        Serial.printf("Changing port to: %s",arg);
+        Serial.printf("Changing port to: %s\r\n",arg);
         /*Set the port*/
 
       }
 
 
       /*Parse command to change the UART UDP forward baud rate*/
-      cmp = strcmp((const char *)gl_console_cmd.buf,"setbaud ");
+      cmp = cmd_match((const char *)gl_console_cmd.buf,"setbaud ");
       if(cmp > 0)
       {
         match = 1;
         const char * arg = (const char *)(&gl_console_cmd.buf[cmp]);
-        Serial.printf("Changing baud to: %s",arg);
+        Serial.printf("Changing baud to: %s\r\n",arg);
         /*Set the baud and reinitalize the slave UART*/
       }
 
 
       /*Parse connect command*/
-      cmp = strcmp((const char *)gl_console_cmd.buf,"reconnect\r");
-      if(cmp >= 0)
+      cmp = cmd_match((const char *)gl_console_cmd.buf,"reconnect\r");
+      if(cmp > 0)
       {
         match = 1;
+        Serial.printf("restarting wifi connection...\r\n");
         /*Try to connect using modified ssid and password. for convenience, as a restart will fulfil the same functionality*/
         WiFi.begin(ssid,password);
       }
