@@ -39,15 +39,11 @@ void loop() {
   }
   init_prefs(&preferences,&gl_prefs);
 
-  /*Begin wifi connection*/
-  WiFi.mode(WIFI_STA);
-  // const char * ssid = "Jupiter7";
-  // const char * password = "Andromeda";
-  // int udp_port = 3425;
-  // int baud = 921600;
-  WiFi.begin((const char *)gl_prefs.ssid,(const char *)gl_prefs.password);
-
   Serial.begin(460800);
+  Serial.printf("\r\n\r\n Trying \'%s\' \'%s\'\r\n",gl_prefs.ssid, gl_prefs.password);
+  /*Begin wifi connection*/
+  WiFi.mode(WIFI_STA);  
+  WiFi.begin((const char *)gl_prefs.ssid, (const char *)gl_prefs.password);
 
   Serial.print("Fuck Arduino\r\n");
 
@@ -124,14 +120,16 @@ void loop() {
         match = 1;
         const char * arg = (const char *)(&gl_console_cmd.buf[cmp]);
         /*Set the ssid*/
-        int i = 0;
-        for(i = 0; arg[i] != '\0'; i++)
-        {
-          gl_prefs.ssid[i] = arg[i];
-        }
-        for(; i < WIFI_MAX_SSID_LEN; i++)
+        for(int i = 0; i < WIFI_MAX_SSID_LEN; i++)
         {
           gl_prefs.ssid[i] = '\0';
+        }
+        for(int i = 0; arg[i] != '\0'; i++)
+        {
+          if(arg[i] != '\r' && arg[i] != '\n')  //copy non carriage return characters
+          {
+            gl_prefs.ssid[i] = arg[i];
+          }
         }
         Serial.printf("Changing ssid to: %s\r\n", gl_prefs.ssid);
         save = 1;
@@ -144,14 +142,16 @@ void loop() {
         match = 1;
         const char * arg = (const char *)(&gl_console_cmd.buf[cmp]);
         /*Set the password*/
-        int i = 0;
-        for(i = 0; arg[i] != '\0'; i++)
-        {
-          gl_prefs.password[i] = arg[i];
-        }
-        for(; i < WIFI_MAX_PWD_LEN; i++)
+        for(int i = 0; i < WIFI_MAX_PWD_LEN; i++)
         {
           gl_prefs.password[i] = '\0';
+        }
+        for(int i = 0; arg[i] != '\0'; i++)
+        {
+          if(arg[i] != '\r' && arg[i] != '\n')
+          {
+            gl_prefs.password[i] = arg[i];
+          }
         }
         Serial.printf("Changing pwd to: %s\r\n",gl_prefs.password);
         save = 1;
@@ -172,12 +172,41 @@ void loop() {
       }
 
       /*Parse read ssid and pwd command*/
-      cmp = cmd_match((const char *)gl_console_cmd.buf,"readcred ");
+      cmp = cmd_match((const char *)gl_console_cmd.buf,"readcred");
       if(cmp > 0)
       {
         match = 1;
-        Serial.printf("SSID: \'%s\'\r\n",gl_prefs.ssid);
-        Serial.printf("password: \'%s\'\r\n",gl_prefs.password);
+        Serial.printf("SSID: \'");
+        for(int i = 0; gl_prefs.ssid[i] != 0; i++)
+        {
+          char c = gl_prefs.ssid[i];
+          if(c >= 0x1f && c <= 0x7E)
+          {
+            Serial.printf("%c",c);
+          }
+          else
+          {
+            Serial.printf("%0.2X",c);
+          }
+        }
+        Serial.printf("\'\r\n");
+
+        Serial.printf("Password: \'");
+        for(int i = 0; gl_prefs.password[i] != 0; i++)
+        {
+          char c = gl_prefs.password[i];
+          if(c >= 0x1f && c <= 0x7E)
+          {
+            Serial.printf("%c",c);
+          }
+          else
+          {
+            Serial.printf("%0.2X",c);
+          }
+        }
+        Serial.printf("\'\r\n");
+
+        
       }
 
       /*Parse command to change the UART UDP forward baud rate*/
@@ -202,6 +231,7 @@ void loop() {
         match = 1;
         Serial.printf("restarting wifi connection...\r\n");
         /*Try to connect using modified ssid and password. for convenience, as a restart will fulfil the same functionality*/
+        WiFi.disconnect();
         WiFi.begin((const char *)gl_prefs.ssid,(const char *)gl_prefs.password);
         udp.begin(server_address, gl_prefs.port);
       }
