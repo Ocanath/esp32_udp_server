@@ -26,14 +26,17 @@ void loop() {
 
   /*Begin wifi connection*/
   WiFi.mode(WIFI_STA);
-  const char * ssid = "PSYONIC Guest";
-  const char * password = "pgsuyeosnt1c";
+  const char * ssid = "Jupiter7";
+  const char * password = "Andromeda";
+  int udp_port = 3425;
   WiFi.begin(ssid,password);
 
   Serial.begin(460800);
 
-  IPAddress server_address((uint32_t)IPV4_ADDR_ANY); //
-  udp.begin(server_address, 3425);
+  Serial.print("Fuck Arduino\r\n");
+
+  IPAddress server_address((uint32_t)IPV4_ADDR_ANY); //note: may want to change to our local IP, to support multiple devices on the network
+  udp.begin(server_address, udp_port);
 
 
   uint32_t blink_ts = 0;
@@ -65,19 +68,94 @@ void loop() {
 
     get_console_lines();
 
-
+    /*Long, hideous, kludged the fuck out command line parser. Don't care, this fw has well defined functionality requirements
+     and it just has to work, so dev speed trumps maintainability */
     if(gl_console_cmd.parsed == 0)
     {
-      if(strcmp((const char *)gl_console_cmd.buf,"ipconfig\r") == 0)
+      uint8_t match = 0;
+      int cmp = -1;
+
+      /*Parse the command to get the local IP and connection status*/
+      cmp = strcmp((const char *)gl_console_cmd.buf,"ipconfig\r");
+      if(cmp >= 0)
       {
-        Serial.printf("IP address is: 0x%0.8X\r\n", WiFi.localIP());
+        match = 1;
+        Serial.printf("IP address is: %s\r\n", WiFi.localIP().toString().c_str());
+        if(WiFi.status() != 0)
+        {
+          Serial.printf("Connected to: %s\r\n", ssid);
+        }
+        else
+        {
+          Serial.printf("Not connected to: %s\r\n", ssid);
+        }
       }
-      else
+
+      /*Parse the command to get UDP server access port*/
+      cmp = strcmp((const char *)gl_console_cmd.buf,"udpconfig\r");
+      if(cmp >= 0)
+      {
+        match = 1;
+        Serial.printf("UDP server on port: %d\r\n", udp_port);
+      }
+      
+      /*Parse ssid command*/
+      cmp = strcmp((const char *)gl_console_cmd.buf,"setssid ");
+      if(cmp > 0)
+      {
+        match = 1;
+        const char * arg = (const char *)(&gl_console_cmd.buf[cmp]);
+        Serial.printf("Changing ssid to: %s",arg);
+        /*Set the ssid*/
+
+      }
+
+      /*Parse password command*/
+      cmp = strcmp((const char *)gl_console_cmd.buf,"setpwd ");
+      if(cmp > 0)
+      {
+        match = 1;
+        const char * arg = (const char *)(&gl_console_cmd.buf[cmp]);
+        Serial.printf("Changing pwd to: %s",arg);
+        /*Set the password*/
+      }
+
+      /*Parse set port command*/
+      cmp = strcmp((const char *)gl_console_cmd.buf,"setport ");
+      if(cmp > 0)
+      {
+        match = 1;
+        const char * arg = (const char *)(&gl_console_cmd.buf[cmp]);
+        Serial.printf("Changing port to: %s",arg);
+        /*Set the port*/
+
+      }
+
+
+      /*Parse command to change the UART UDP forward baud rate*/
+      cmp = strcmp((const char *)gl_console_cmd.buf,"setbaud ");
+      if(cmp > 0)
+      {
+        match = 1;
+        const char * arg = (const char *)(&gl_console_cmd.buf[cmp]);
+        Serial.printf("Changing baud to: %s",arg);
+        /*Set the baud and reinitalize the slave UART*/
+      }
+
+
+      /*Parse connect command*/
+      cmp = strcmp((const char *)gl_console_cmd.buf,"reconnect\r");
+      if(cmp >= 0)
+      {
+        match = 1;
+        /*Try to connect using modified ssid and password. for convenience, as a restart will fulfil the same functionality*/
+        WiFi.begin(ssid,password);
+      }
+
+      if(match == 0)
       {
         Serial.printf("Failed to parse: %s\r\n", gl_console_cmd.buf);
       }
-
-
 
       for(int i = 0; i < BUFFER_SIZE; i++)
       {
@@ -103,12 +181,27 @@ void loop() {
       blink_ts = millis();
       digitalWrite(2, led_mode);
       led_mode = (~led_mode) & 1;
-
       if(WiFi.status() != WL_CONNECTED)
       {
         WiFi.reconnect();
       }
     }
+
+    /*The following pseudocode should be used for offloading
+    32bit fletcher's checksum masked uart packets over UDP, without
+    having to write my own baremetal UART for the ESP32. TODO: determine
+    whether this will work. consider using a loopback approach with logic
+    analyzer for ease of use*/
+    // while(Serial1.available())
+    // {
+    //   uint8_t d = Serial1.read();
+    //   update_circular_buffer(d,&cb);
+    // }
+    // if(search_circular_buffer_for_chkmatch(&cb) != 0)
+    // {
+    //   offload_circular_buffer_udp(&cb);
+    // }
+
   }  
 
 }
