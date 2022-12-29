@@ -125,9 +125,12 @@ void loop() {
         const char * arg = (const char *)(&gl_console_cmd.buf[cmp]);
         Serial.printf("Changing ssid to: %s\r\n",arg);
         /*Set the ssid*/
-        for(int i = 0; arg[i] != '\0'; i++)
+        for(int i = 0; i < WIFI_MAX_SSID_LEN; i++)
         {
-          gl_prefs.ssid[i] = arg[i];
+          if(arg[i] != '\0')
+            gl_prefs.ssid[i] = arg[i];
+          else
+            gl_prefs.ssid[i] = '\0';
         }
         save = 1;
       }
@@ -140,9 +143,12 @@ void loop() {
         const char * arg = (const char *)(&gl_console_cmd.buf[cmp]);
         Serial.printf("Changing pwd to: %s\r\n",arg);
         /*Set the password*/
-        for(int i = 0; arg[i] != '\0'; i++)
+        for(int i = 0; i < WIFI_MAX_PWD_LEN; i++)
         {
-          gl_prefs.password[i] = arg[i];
+          if(arg[i] != '\0')
+            gl_prefs.password[i] = arg[i];
+          else
+            gl_prefs.password[i] = '\0';
         }
         save = 1;
       }
@@ -185,7 +191,16 @@ void loop() {
         Serial.printf("restarting wifi connection...\r\n");
         /*Try to connect using modified ssid and password. for convenience, as a restart will fulfil the same functionality*/
         WiFi.begin((const char *)gl_prefs.ssid,(const char *)gl_prefs.password);
+        udp.begin(server_address, gl_prefs.port);
       }
+
+      cmp = cmd_match((const char *)gl_console_cmd.buf,"restart\r");
+      if(cmp > 0)
+      {
+        Serial.printf("restarting chip...\r\n");
+        ESP.restart();
+      }
+
 
       if(match == 0)
       {
