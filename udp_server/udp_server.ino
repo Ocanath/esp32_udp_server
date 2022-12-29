@@ -123,15 +123,17 @@ void loop() {
       {
         match = 1;
         const char * arg = (const char *)(&gl_console_cmd.buf[cmp]);
-        Serial.printf("Changing ssid to: %s\r\n",arg);
         /*Set the ssid*/
-        for(int i = 0; i < WIFI_MAX_SSID_LEN; i++)
+        int i = 0;
+        for(i = 0; arg[i] != '\0'; i++)
         {
-          if(arg[i] != '\0')
-            gl_prefs.ssid[i] = arg[i];
-          else
-            gl_prefs.ssid[i] = '\0';
+          gl_prefs.ssid[i] = arg[i];
         }
+        for(; i < WIFI_MAX_SSID_LEN; i++)
+        {
+          gl_prefs.ssid[i] = '\0';
+        }
+        Serial.printf("Changing ssid to: %s\r\n", gl_prefs.ssid);
         save = 1;
       }
 
@@ -141,15 +143,17 @@ void loop() {
       {
         match = 1;
         const char * arg = (const char *)(&gl_console_cmd.buf[cmp]);
-        Serial.printf("Changing pwd to: %s\r\n",arg);
         /*Set the password*/
-        for(int i = 0; i < WIFI_MAX_PWD_LEN; i++)
+        int i = 0;
+        for(i = 0; arg[i] != '\0'; i++)
         {
-          if(arg[i] != '\0')
-            gl_prefs.password[i] = arg[i];
-          else
-            gl_prefs.password[i] = '\0';
+          gl_prefs.password[i] = arg[i];
         }
+        for(; i < WIFI_MAX_PWD_LEN; i++)
+        {
+          gl_prefs.password[i] = '\0';
+        }
+        Serial.printf("Changing pwd to: %s\r\n",gl_prefs.password);
         save = 1;
       }
 
@@ -167,6 +171,14 @@ void loop() {
         save = 1;
       }
 
+      /*Parse read ssid and pwd command*/
+      cmp = cmd_match((const char *)gl_console_cmd.buf,"readcred ");
+      if(cmp > 0)
+      {
+        match = 1;
+        Serial.printf("SSID: \'%s\'\r\n",gl_prefs.ssid);
+        Serial.printf("password: \'%s\'\r\n",gl_prefs.password);
+      }
 
       /*Parse command to change the UART UDP forward baud rate*/
       cmp = cmd_match((const char *)gl_console_cmd.buf,"setbaud ");
