@@ -1,7 +1,7 @@
 #include "WiFi.h"
 #include "WiFiUdp.h"
-#include "Preferences.h"
 #include "parse_console.h"
+#include "nvs.h"
 
 #define IPV4_ADDR_ANY   0x00000000UL
 
@@ -26,6 +26,7 @@ int cmd_match(const char * in, const char * cmd)
   return i;
 }
 
+
 void loop() {  
   /*Do a power on blink pattern*/
   pinMode(2,OUTPUT);
@@ -36,20 +37,22 @@ void loop() {
     digitalWrite(2,LOW);
     delay(50);
   }
+  init_prefs(&preferences,&gl_prefs);
 
   /*Begin wifi connection*/
   WiFi.mode(WIFI_STA);
-  const char * ssid = "Jupiter7";
-  const char * password = "Andromeda";
-  int udp_port = 3425;
-  WiFi.begin(ssid,password);
+  // const char * ssid = "Jupiter7";
+  // const char * password = "Andromeda";
+  // int udp_port = 3425;
+  // int baud = 921600;
+  WiFi.begin((const char *)gl_prefs.ssid,(const char *)gl_prefs.password);
 
   Serial.begin(460800);
 
   Serial.print("Fuck Arduino\r\n");
 
   IPAddress server_address((uint32_t)IPV4_ADDR_ANY); //note: may want to change to our local IP, to support multiple devices on the network
-  udp.begin(server_address, udp_port);
+  udp.begin(server_address, gl_prefs.port);
 
 
   uint32_t blink_ts = 0;
@@ -86,6 +89,7 @@ void loop() {
     if(gl_console_cmd.parsed == 0)
     {
       uint8_t match = 0;
+      uint8_t save = 0;
       int cmp = -1;
 
       /*Parse the command to get the local IP and connection status*/
@@ -93,15 +97,15 @@ void loop() {
       if(cmp == 0)
       {
         match = 1;
-        if(WiFi.status() != 0)
+        if(WiFi.status() == WL_CONNECTED)
         {
-          Serial.printf("Connected to: %s\r\n", ssid);
+          Serial.printf("Connected to: %s\r\n", gl_prefs.ssid);
         }
         else
         {
-          Serial.printf("Not connected to: %s\r\n", ssid);
+          Serial.printf("Not connected to: %s\r\n", gl_prefs.ssid);
         }
-        Serial.printf("UDP server on port: %d\r\n", udp_port);
+        Serial.printf("UDP server on port: %d\r\n", gl_prefs.port);
         Serial.printf("IP address is: %s\r\n", WiFi.localIP().toString().c_str());
       }
 
@@ -110,7 +114,7 @@ void loop() {
       if(cmp > 0)
       {
         match = 1;
-        Serial.printf("UDP server on port: %d\r\n", udp_port);
+        Serial.printf("UDP server on port: %d\r\n", gl_prefs.port);
       }
       
       /*Parse ssid command*/
@@ -121,7 +125,11 @@ void loop() {
         const char * arg = (const char *)(&gl_console_cmd.buf[cmp]);
         Serial.printf("Changing ssid to: %s\r\n",arg);
         /*Set the ssid*/
-
+        for(int i = 0; arg[i] != '\0'; i++)
+        {
+          gl_prefs.ssid[i] = arg[i];
+        }
+        save = 1;
       }
 
       /*Parse password command*/
@@ -132,6 +140,11 @@ void loop() {
         const char * arg = (const char *)(&gl_console_cmd.buf[cmp]);
         Serial.printf("Changing pwd to: %s\r\n",arg);
         /*Set the password*/
+        for(int i = 0; arg[i] != '\0'; i++)
+        {
+          gl_prefs.password[i] = arg[i];
+        }
+        save = 1;
       }
 
       /*Parse set port command*/
@@ -140,9 +153,12 @@ void loop() {
       {
         match = 1;
         const char * arg = (const char *)(&gl_console_cmd.buf[cmp]);
-        Serial.printf("Changing port to: %s\r\n",arg);
+        char * tmp;
+        int port = strtol(arg, &tmp, 10);
+        Serial.printf("Changing port to: %d\r\n",port);
         /*Set the port*/
-
+        gl_prefs.port = port;
+        save = 1;
       }
 
 
@@ -152,8 +168,12 @@ void loop() {
       {
         match = 1;
         const char * arg = (const char *)(&gl_console_cmd.buf[cmp]);
-        Serial.printf("Changing baud to: %s\r\n",arg);
+        char * tmp;
+        int baud = strtol(arg, &tmp, 10);
+        Serial.printf("Changing baud to: %d\r\n",baud);
         /*Set the baud and reinitalize the slave UART*/
+        gl_prefs.baud = baud;
+        save = 1;
       }
 
 
@@ -164,12 +184,17 @@ void loop() {
         match = 1;
         Serial.printf("restarting wifi connection...\r\n");
         /*Try to connect using modified ssid and password. for convenience, as a restart will fulfil the same functionality*/
-        WiFi.begin(ssid,password);
+        WiFi.begin((const char *)gl_prefs.ssid,(const char *)gl_prefs.password);
       }
 
       if(match == 0)
       {
         Serial.printf("Failed to parse: %s\r\n", gl_console_cmd.buf);
+      }
+      if(save != 0)
+      {
+        int nb = preferences.putBytes("settings", &gl_prefs, sizeof(nvs_settings_t));
+        Serial.printf("Saved %d bytes\r\n", nb);
       }
 
       for(int i = 0; i < BUFFER_SIZE; i++)
