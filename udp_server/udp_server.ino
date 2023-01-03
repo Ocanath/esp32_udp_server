@@ -2,6 +2,7 @@
 #include "WiFiUdp.h"
 #include "parse_console.h"
 #include "nvs.h"
+#include "checksum.h"
 
 #define IPV4_ADDR_ANY   0x00000000UL
 
@@ -40,6 +41,8 @@ void loop() {
   init_prefs(&preferences,&gl_prefs);
 
   Serial.begin(460800);
+  if(gl_prefs.baud != 0)
+    Serial1.begin(gl_prefs.baud);
   Serial.printf("\r\n\r\n Trying \'%s\' \'%s\'\r\n",gl_prefs.ssid, gl_prefs.password);
   /*Begin wifi connection*/
   WiFi.mode(WIFI_STA);  
@@ -63,20 +66,30 @@ void loop() {
     if(len != 0)
     {
       int len = udp.read(udp_pkt_buf,255);
-      udp_pkt_buf[len] = 0; //clear last element to null term string before writing
-      Serial.write("Received: ");
-      Serial.write((const char *)udp_pkt_buf);
-      Serial.write("\r\n");
-
-      udp.beginPacket(udp.remoteIP(), udp.remotePort());
-      udp.printf("received: ");
-      udp.printf((const char *)udp_pkt_buf);
-      udp.printf("\r\n");
-      udp.endPacket();
-
+      Serial1.write(udp_pkt_buf,len);
+      
       for(int i = 0; i < len; i++)
         udp_pkt_buf[i] = 0;
     }
+    /*The following pseudocode should be used for offloading
+    32bit fletcher's checksum masked uart packets over UDP, without
+    having to write my own baremetal UART for the ESP32. TODO: determine
+    whether this will work. consider using a loopback approach with logic
+    analyzer for ease of use*/
+    // while(Serial1.available())
+    // {
+    //   uint8_t d = Serial1.read();
+    //   update_circular_buffer(d,&cb);
+    // }
+    // if(search_circular_buffer_for_chkmatch(&cb) != 0)
+    // {
+    //   offload_circular_buffer_udp(&cb);
+      // udp.beginPacket(udp.remoteIP(), udp.remotePort());
+      // udp.printf("received: ");
+      // udp.printf((const char *)udp_pkt_buf);
+      // udp.printf("\r\n");
+      // udp.endPacket();
+    // }
 
     get_console_lines();
 
@@ -283,22 +296,6 @@ void loop() {
         WiFi.reconnect();
       }
     }
-
-    /*The following pseudocode should be used for offloading
-    32bit fletcher's checksum masked uart packets over UDP, without
-    having to write my own baremetal UART for the ESP32. TODO: determine
-    whether this will work. consider using a loopback approach with logic
-    analyzer for ease of use*/
-    // while(Serial1.available())
-    // {
-    //   uint8_t d = Serial1.read();
-    //   update_circular_buffer(d,&cb);
-    // }
-    // if(search_circular_buffer_for_chkmatch(&cb) != 0)
-    // {
-    //   offload_circular_buffer_udp(&cb);
-    // }
-
   }  
 
 }

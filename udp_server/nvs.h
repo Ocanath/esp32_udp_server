@@ -12,6 +12,8 @@ typedef struct nvs_settings_t
   char password[WIFI_MAX_PWD_LEN];
   int port; //udp server forwarding port
   int baud;
+  uint8_t nbytes_fchk;  //setting can be 0->default 4, 1, 2, or 4
+  int nbytes_expected; //if 0, then the pkt can have any size where the chksum matches. prone to frequent errors if checksum bitwidth is small
 }nvs_settings_t;
 
 extern Preferences preferences;
