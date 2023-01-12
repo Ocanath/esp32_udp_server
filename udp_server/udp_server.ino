@@ -84,16 +84,15 @@ void loop() {
     while(Serial1.available())
     {
        uint8_t d = Serial1.read();
-      //  //update_circular_buffer(d,&cb);
-      //  add_circ_buffer_element(d, &gl_cb);
-      //  int len;
-      //  if(scan_lg_fifo_fchk32(&gl_cb, gl_prefs.nwords_expected, gl_cb_result, &len) == 1)
-      //  {
-      //     Serial.printf("Found: 0x");
-      //     for(int i = 0; i < len; i++)
-      //       Serial.printf("%0.2X",gl_cb_result[i]);
-      //     Serial.printf("\r\n");
-      //  }
+       add_circ_buffer_element(d, &gl_cb);
+       int len;
+       if(scan_lg_fifo_fchk32(&gl_cb, gl_prefs.nwords_expected, gl_cb_result, &len) == 1)
+       {
+          Serial.printf("Found: 0x");
+          for(int i = 0; i < len; i++)
+            Serial.printf("%0.2X",gl_cb_result[i]);
+          Serial.printf("\r\n");
+       }
     }
  
     get_console_lines();
