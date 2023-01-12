@@ -235,6 +235,14 @@ void loop() {
         gl_prefs.baud = baud;
         save = 1;
       }
+            
+      /*Parse command to report current baud setting*/
+      cmp = cmd_match((const char *)gl_console_cmd.buf,"readbaud\r");
+      if(cmp > 0)
+      {
+        match = 1;
+        Serial.printf("Changing baud to: %d\r\n", gl_prefs.baud);
+      }
 
 
       /*Parse connect command*/
