@@ -3,6 +3,7 @@
 #include "parse_console.h"
 #include "nvs.h"
 #include "checksum.h"
+#include "circ_scan.h"
 
 #define IPV4_ADDR_ANY   0x00000000UL
 
@@ -27,6 +28,8 @@ int cmd_match(const char * in, const char * cmd)
   return i;
 }
 
+lg_fifo_t gl_cb;
+uint32_t gl_cb_result[NUM_WORDS_FIFO];  //drawback of the circular buffer copy approach: must make it a double buffer. is pretty wasteful
 
 void loop() {  
   /*Do a power on blink pattern*/
@@ -43,6 +46,8 @@ void loop() {
   Serial.begin(460800);
   if(gl_prefs.baud != 0)
     Serial1.begin(gl_prefs.baud);
+  if(gl_prefs.nwords_expected == 0) //quick & dirty kludge for init case of this parameter
+    gl_prefs.nwords_expected = 1;
   Serial.printf("\r\n\r\n Trying \'%s\' \'%s\'\r\n",gl_prefs.ssid, gl_prefs.password);
   /*Begin wifi connection*/
   WiFi.mode(WIFI_STA);  
@@ -76,21 +81,21 @@ void loop() {
     having to write my own baremetal UART for the ESP32. TODO: determine
     whether this will work. consider using a loopback approach with logic
     analyzer for ease of use*/
-    // while(Serial1.available())
-    // {
-    //   uint8_t d = Serial1.read();
-    //   update_circular_buffer(d,&cb);
-    // }
-    // if(search_circular_buffer_for_chkmatch(&cb) != 0)
-    // {
-    //   offload_circular_buffer_udp(&cb);
-      // udp.beginPacket(udp.remoteIP(), udp.remotePort());
-      // udp.printf("received: ");
-      // udp.printf((const char *)udp_pkt_buf);
-      // udp.printf("\r\n");
-      // udp.endPacket();
-    // }
-
+    while(Serial1.available())
+    {
+       uint8_t d = Serial1.read();
+      //  //update_circular_buffer(d,&cb);
+      //  add_circ_buffer_element(d, &gl_cb);
+      //  int len;
+      //  if(scan_lg_fifo_fchk32(&gl_cb, gl_prefs.nwords_expected, gl_cb_result, &len) == 1)
+      //  {
+      //     Serial.printf("Found: 0x");
+      //     for(int i = 0; i < len; i++)
+      //       Serial.printf("%0.2X",gl_cb_result[i]);
+      //     Serial.printf("\r\n");
+      //  }
+    }
+ 
     get_console_lines();
 
     /*Long, hideous, kludged the fuck out command line parser. Don't care, this fw has well defined functionality requirements
@@ -235,7 +240,7 @@ void loop() {
         gl_prefs.baud = baud;
         save = 1;
       }
-            
+      
       /*Parse command to report current baud setting*/
       cmp = cmd_match((const char *)gl_console_cmd.buf,"readbaud\r");
       if(cmp > 0)

@@ -1,5 +1,6 @@
 #ifndef PARSE_CONSOLE_H
 #define PARSE_CONSOLE_H
+
 #include <Arduino.h>
 #include <stdint.h>
 #define BUFFER_SIZE 128
