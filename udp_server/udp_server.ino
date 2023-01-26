@@ -61,7 +61,7 @@ void loop() {
 
   uint32_t blink_ts = 0;
   uint32_t blink_period = PERIOD_DISCONNECTED;
-  uint8_t led_mode = 0;
+  uint8_t led_mode = 1;
 
   uint8_t udp_pkt_buf[256] = {0};
   while(1)
@@ -88,10 +88,13 @@ void loop() {
        int len;
        if(scan_lg_fifo_fchk32(&gl_cb, gl_prefs.nwords_expected, gl_cb_result, &len) == 1)
        {
-          Serial.printf("Found: 0x");
-          for(int i = 0; i < len; i++)
-            Serial.printf("%0.2X",gl_cb_result[i]);
-          Serial.printf("\r\n");
+          // Serial.printf("Found: 0x");
+          // for(int i = 0; i < len; i++)
+          //   Serial.printf("%0.2X",gl_cb_result[i]);
+          // Serial.printf("\r\n");
+          udp.beginPacket(udp.remoteIP(), udp.remotePort());
+          udp.write((uint8_t*)gl_cb_result,len*sizeof(uint32_t));
+          udp.endPacket();          
        }
     }
  
@@ -240,14 +243,38 @@ void loop() {
         save = 1;
       }
       
+      /*Parse command to change the UART expected packet size. DO NOT INCLUDE CHECKSUM AS A WORD! 
+      I.e. if you have 4 words + 1 checksum for 5 total words, setrsize = 4 for proper readings.*/
+      cmp = cmd_match((const char *)gl_console_cmd.buf,"setrsize ");
+      if(cmp > 0)
+      {
+        match = 1;
+        const char * arg = (const char *)(&gl_console_cmd.buf[cmp]);
+        char * tmp;
+        int size = strtol(arg, &tmp, 10);
+        Serial.printf("Changing rsize to: %d\r\n",size);
+        /*Set the baud and reinitalize the slave UART*/
+        gl_prefs.nwords_expected = size;
+        save = 1;
+      }
+
+
       /*Parse command to report current baud setting*/
       cmp = cmd_match((const char *)gl_console_cmd.buf,"readbaud\r");
       if(cmp > 0)
       {
         match = 1;
-        Serial.printf("Changing baud to: %d\r\n", gl_prefs.baud);
+        Serial.printf("Baud is: %d\r\n", gl_prefs.baud);
       }
 
+
+      /*Parse command to report current baud setting*/
+      cmp = cmd_match((const char *)gl_console_cmd.buf,"readrsize\r");
+      if(cmp > 0)
+      {
+        match = 1;
+        Serial.printf("Readsize: %d\r\n", gl_prefs.nwords_expected);
+      }
 
       /*Parse connect command*/
       cmp = cmd_match((const char *)gl_console_cmd.buf,"reconnect\r");
@@ -305,7 +332,11 @@ void loop() {
       led_mode = (~led_mode) & 1;
       if(WiFi.status() != WL_CONNECTED)
       {
-        WiFi.reconnect();
+        //WiFi.reconnect();
+        WiFi.disconnect();
+        WiFi.begin((const char *)gl_prefs.ssid,(const char *)gl_prefs.password);
+        udp.begin(server_address, gl_prefs.port);
+
       }
     }
   }  
