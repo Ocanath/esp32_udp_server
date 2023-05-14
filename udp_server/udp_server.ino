@@ -4,6 +4,10 @@
 #include "nvs.h"
 #include "checksum.h"
 #include "circ_scan.h"
+#include <WiFi.h>
+#include <ESPmDNS.h>
+#include <WiFiUdp.h>
+#include <ArduinoOTA.h>
 
 #define IPV4_ADDR_ANY   0x00000000UL
 
@@ -12,7 +16,82 @@ enum {PERIOD_CONNECTED = 50, PERIOD_DISCONNECTED = 3000};
 WiFiUDP udp;
 
 void setup() {
-  //fuck you
+
+  /*Do a power on blink pattern*/
+  pinMode(2,OUTPUT);
+  for(int i = 0; i < 4; i++)
+  {
+    digitalWrite(2,HIGH);
+    delay(50);
+    digitalWrite(2,LOW);
+    delay(50);
+  }
+  init_prefs(&preferences,&gl_prefs);
+
+  Serial.begin(460800);
+  if(gl_prefs.baud != 0)
+    Serial1.begin(gl_prefs.baud);
+  if(gl_prefs.nwords_expected == 0) //quick & dirty kludge for init case of this parameter
+    gl_prefs.nwords_expected = 1;
+  
+  int connected = 0;
+  for(int attempts = 0; attempts < 10; attempts++)
+  {
+    Serial.printf("\r\n\r\n Trying \'%s\' \'%s\'\r\n",gl_prefs.ssid, gl_prefs.password);
+    /*Begin wifi connection*/
+    WiFi.mode(WIFI_STA);  
+    WiFi.begin((const char *)gl_prefs.ssid, (const char *)gl_prefs.password);
+    connected = WiFi.waitForConnectResult();
+    while (connected != WL_CONNECTED) {
+      Serial.printf("Connection to network %s failed for an unknown reason\r\n", (const char *)gl_prefs.ssid);
+    }
+  }
+  if(connected == 0)
+  {
+    while(1)
+    {
+      uint8_t toggle = 0;
+      for(uint32_t delay_ms = 2000; delay_ms >= 50; delay_ms-=50)
+      {
+        digitalWrite(2,toggle);
+        delay(delay_ms);
+        toggle = (~toggle) & 1;
+      }
+    }
+  }
+
+
+  /*
+  Arduino OTA setup
+  */
+  ArduinoOTA
+    .onStart([]() {
+      String type;
+      if (ArduinoOTA.getCommand() == U_FLASH)
+        type = "sketch";
+      else // U_SPIFFS
+        type = "filesystem";
+
+      // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
+      Serial.println("Start updating " + type);
+    })
+    .onEnd([]() {
+      Serial.println("\nEnd");
+    })
+    .onProgress([](unsigned int progress, unsigned int total) {
+      Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+    })
+    .onError([](ota_error_t error) {
+      Serial.printf("Error[%u]: ", error);
+      if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+      else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+      else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+      else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+      else if (error == OTA_END_ERROR) Serial.println("End Failed");
+    });
+
+  ArduinoOTA.begin();
+
 }
 
 int cmd_match(const char * in, const char * cmd)
@@ -32,26 +111,6 @@ lg_fifo_t gl_cb;
 uint32_t gl_cb_result[NUM_WORDS_FIFO];  //drawback of the circular buffer copy approach: must make it a double buffer. is pretty wasteful
 
 void loop() {  
-  /*Do a power on blink pattern*/
-  pinMode(2,OUTPUT);
-  for(int i = 0; i < 4; i++)
-  {
-    digitalWrite(2,HIGH);
-    delay(50);
-    digitalWrite(2,LOW);
-    delay(50);
-  }
-  init_prefs(&preferences,&gl_prefs);
-
-  Serial.begin(460800);
-  if(gl_prefs.baud != 0)
-    Serial1.begin(gl_prefs.baud);
-  if(gl_prefs.nwords_expected == 0) //quick & dirty kludge for init case of this parameter
-    gl_prefs.nwords_expected = 1;
-  Serial.printf("\r\n\r\n Trying \'%s\' \'%s\'\r\n",gl_prefs.ssid, gl_prefs.password);
-  /*Begin wifi connection*/
-  WiFi.mode(WIFI_STA);  
-  WiFi.begin((const char *)gl_prefs.ssid, (const char *)gl_prefs.password);
 
   Serial.print("Fuck Arduino\r\n");
 
@@ -66,6 +125,7 @@ void loop() {
   uint8_t udp_pkt_buf[256] = {0};
   while(1)
   {
+    ArduinoOTA.handle();  //handle OTA updates!
 
     int len = udp.parsePacket();
     if(len != 0)
