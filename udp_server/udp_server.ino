@@ -35,28 +35,15 @@ void setup() {
     gl_prefs.nwords_expected = 1;
   
   int connected = 0;
-  for(int attempts = 0; attempts < 10; attempts++)
+  for(int attempts = 0; attempts < 1; attempts++)
   {
     Serial.printf("\r\n\r\n Trying \'%s\' \'%s\'\r\n",gl_prefs.ssid, gl_prefs.password);
     /*Begin wifi connection*/
     WiFi.mode(WIFI_STA);  
     WiFi.begin((const char *)gl_prefs.ssid, (const char *)gl_prefs.password);
-    connected = WiFi.waitForConnectResult();
-    while (connected != WL_CONNECTED) {
+    //connected = WiFi.waitForConnectResult();
+    if (connected != WL_CONNECTED) {
       Serial.printf("Connection to network %s failed for an unknown reason\r\n", (const char *)gl_prefs.ssid);
-    }
-  }
-  if(connected == 0)
-  {
-    while(1)
-    {
-      uint8_t toggle = 0;
-      for(uint32_t delay_ms = 2000; delay_ms >= 50; delay_ms-=50)
-      {
-        digitalWrite(2,toggle);
-        delay(delay_ms);
-        toggle = (~toggle) & 1;
-      }
     }
   }
 
