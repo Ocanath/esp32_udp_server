@@ -26,11 +26,11 @@ void setup() {
     digitalWrite(2,LOW);
     delay(50);
   }
-  init_prefs(&preferences,&gl_prefs);
+  init_prefs(&preferences, &gl_prefs);
 
   Serial.begin(460800);
   if(gl_prefs.baud != 0)
-    Serial1.begin(gl_prefs.baud);
+    Serial2.begin(gl_prefs.baud);
   if(gl_prefs.nwords_expected == 0) //quick & dirty kludge for init case of this parameter
     gl_prefs.nwords_expected = 1;
   
@@ -118,7 +118,7 @@ void loop() {
     if(len != 0)
     {
       int len = udp.read(udp_pkt_buf,255);
-      Serial1.write(udp_pkt_buf,len);
+      Serial2.write(udp_pkt_buf,len);
       
       for(int i = 0; i < len; i++)
         udp_pkt_buf[i] = 0;
@@ -128,9 +128,9 @@ void loop() {
     having to write my own baremetal UART for the ESP32. TODO: determine
     whether this will work. consider using a loopback approach with logic
     analyzer for ease of use*/
-    while(Serial1.available())
+    while(Serial2.available())
     {
-       uint8_t d = Serial1.read();
+       uint8_t d = Serial2.read();
        add_circ_buffer_element(d, &gl_cb);
        int len;
        if(scan_lg_fifo_fchk32(&gl_cb, gl_prefs.nwords_expected, gl_cb_result, &len) == 1)
