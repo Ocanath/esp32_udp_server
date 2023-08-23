@@ -120,6 +120,25 @@ void loop() {
       int len = udp.read(udp_pkt_buf,255);
       Serial2.write(udp_pkt_buf,len);
       
+      /*Simple bkst reply to allow a client to confirm our IP. 
+      Sends mac address as a unique identifier, to handle responses from multiple
+      devices on network if there are multiple*/
+      int cmp = -1;
+      cmp = cmd_match((const char *)udp_pkt_buf,"marco");
+      if(cmp > 0)
+      {
+        uint8_t query_response[11] = {0};
+        query_response[0] = 'p';
+        query_response[1] = 'o';
+        query_response[2] = 'l';
+        query_response[3] = 'o';
+        query_response[4] = ' ';
+        WiFi.macAddress((&query_response[5]));
+        udp.beginPacket(udp.remoteIP(), udp.remotePort());
+        udp.write(query_response,11);
+        udp.endPacket();
+      }
+
       for(int i = 0; i < len; i++)
         udp_pkt_buf[i] = 0;
     }
