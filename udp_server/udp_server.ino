@@ -110,6 +110,7 @@ void loop() {
   uint8_t led_mode = 1;
 
   uint8_t udp_pkt_buf[256] = {0};
+  uint32_t packet_update_ts = 0;
   while(1)
   {
     ArduinoOTA.handle();  //handle OTA updates!
@@ -142,11 +143,13 @@ void loop() {
       for(int i = 0; i < len; i++)
         udp_pkt_buf[i] = 0;
     }
+
     /*The following pseudocode should be used for offloading
     32bit fletcher's checksum masked uart packets over UDP, without
     having to write my own baremetal UART for the ESP32. TODO: determine
     whether this will work. consider using a loopback approach with logic
     analyzer for ease of use*/
+    uint8_t serial_pkt_sent = 0;
     while(Serial2.available())
     {
        uint8_t d = Serial2.read();
@@ -160,10 +163,24 @@ void loop() {
           // Serial.printf("\r\n");
           udp.beginPacket(udp.remoteIP(), udp.remotePort());
           udp.write((uint8_t*)gl_cb_result,len*sizeof(uint32_t));
-          udp.endPacket();          
+          udp.endPacket();      
+          serial_pkt_sent = 1;
        }
     }
- 
+
+    /*Point the hose at the person who looked at us*/
+    uint32_t tick = millis();
+    if(tick - packet_update_ts > 20)
+    {
+      packet_update_ts = tick;
+      if(serial_pkt_sent == 0)
+      {
+        udp.beginPacket(udp.remoteIP(), udp.remotePort());
+        udp.write((uint8_t*)"WAZZUP",6);
+        udp.endPacket();          
+      }
+    }
+
     get_console_lines();
 
     /*Long, hideous, kludged the fuck out command line parser. Don't care, this fw has well defined functionality requirements
