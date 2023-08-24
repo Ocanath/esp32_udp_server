@@ -111,6 +111,7 @@ void loop() {
 
   uint8_t udp_pkt_buf[256] = {0};
   uint32_t packet_update_ts = 0;
+  uint8_t activate_hose = 0;
   while(1)
   {
     ArduinoOTA.handle();  //handle OTA updates!
@@ -139,7 +140,17 @@ void loop() {
         udp.write(query_response,11);
         udp.endPacket();
       }
-
+      cmp = cmd_match((const char *)udp_pkt_buf,"activate_hose");
+      if(cmp > 0)
+      {
+        activate_hose = 1;
+      }
+      cmp = cmd_match((const char *)udp_pkt_buf,"deactivate_hose");
+      if(cmp > 0)
+      {
+        activate_hose = 0;
+      }
+      
       for(int i = 0; i < len; i++)
         udp_pkt_buf[i] = 0;
     }
@@ -168,19 +179,21 @@ void loop() {
        }
     }
 
-    /*Point the hose at the person who looked at us*/
-    uint32_t tick = millis();
-    if(tick - packet_update_ts > 20)
+    if(activate_hose != 0)
     {
-      packet_update_ts = tick;
-      if(serial_pkt_sent == 0)
+      /*Point the hose at the person who looked at us*/
+      uint32_t tick = millis();
+      if(tick - packet_update_ts > 20)
       {
-        udp.beginPacket(udp.remoteIP(), udp.remotePort());
-        udp.write((uint8_t*)"WAZZUP",6);
-        udp.endPacket();          
+        packet_update_ts = tick;
+        if(serial_pkt_sent == 0)
+        {
+          udp.beginPacket(udp.remoteIP(), udp.remotePort());
+          udp.write((uint8_t*)"WAZZUP",6);
+          udp.endPacket();          
+        }
       }
     }
-
     get_console_lines();
 
     /*Long, hideous, kludged the fuck out command line parser. Don't care, this fw has well defined functionality requirements
