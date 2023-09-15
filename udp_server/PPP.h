@@ -1,3 +1,6 @@
+#ifndef PPP_H
+#define PPP_H
+
 #include <stdint.h>
 
 #define FRAME_CHAR 0x7E
@@ -10,3 +13,4 @@ int PPP_unstuff( uint8_t * payload, int payload_buffer_size, uint8_t * stuffed_b
 int parse_PPP_stream(uint8_t new_byte, uint8_t* payload_buffer, int payload_buffer_size, uint8_t* input_buffer, int input_buffer_size, int* bidx);
 
 
+#endif

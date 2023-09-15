@@ -4,10 +4,12 @@
 #include "nvs.h"
 #include "checksum.h"
 #include "circ_scan.h"
+#include "PPP.h"
 #include <WiFi.h>
 #include <ESPmDNS.h>
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
+
 
 #define IPV4_ADDR_ANY   0x00000000UL
 
@@ -94,8 +96,12 @@ int cmd_match(const char * in, const char * cmd)
   return i;
 }
 
-lg_fifo_t gl_cb;
-uint32_t gl_cb_result[NUM_WORDS_FIFO];  //drawback of the circular buffer copy approach: must make it a double buffer. is pretty wasteful
+//lg_fifo_t gl_cb;
+//uint32_t gl_cb_result[NUM_WORDS_FIFO];  //drawback of the circular buffer copy approach: must make it a double buffer. is pretty wasteful
+#define UNSTUFFING_BUFFER_SIZE 256
+#define PAYLOAD_BUFFER_SIZE ((UNSTUFFING_BUFFER_SIZE - 2)/2)  //max cap based on unstuffing buffer size
+uint8_t gl_unstuffing_buffer[UNSTUFFING_BUFFER_SIZE] = {0};
+uint8_t gl_pld_buffer[PAYLOAD_BUFFER_SIZE] = {0};
 
 void loop() {  
 
@@ -112,6 +118,8 @@ void loop() {
   uint8_t udp_pkt_buf[256] = {0};
   uint32_t packet_update_ts = 0;
   uint8_t activate_hose = 0;
+  
+  int ppp_stuffing_bidx = 0;  //arg output/static variable for indexing into the stuffing buffer for ppp unpacking
   while(1)
   {
     ArduinoOTA.handle();  //handle OTA updates!
@@ -163,17 +171,12 @@ void loop() {
     uint8_t serial_pkt_sent = 0;
     while(Serial2.available())
     {
-       uint8_t d = Serial2.read();
-       add_circ_buffer_element(d, &gl_cb);
-       int len;
-       if(scan_lg_fifo_fchk32(&gl_cb, gl_prefs.nwords_expected, gl_cb_result, &len) == 1)
+       uint8_t new_byte = Serial2.read();
+       int pld_len = parse_PPP_stream(new_byte, gl_pld_buffer, PAYLOAD_BUFFER_SIZE, gl_unstuffing_buffer, UNSTUFFING_BUFFER_SIZE, &ppp_stuffing_bidx);
+       if(pld_len != 0)
        {
-          // Serial.printf("Found: 0x");
-          // for(int i = 0; i < len; i++)
-          //   Serial.printf("%0.2X",gl_cb_result[i]);
-          // Serial.printf("\r\n");
           udp.beginPacket(udp.remoteIP(), udp.remotePort());
-          udp.write((uint8_t*)gl_cb_result,len*sizeof(uint32_t));
+          udp.write((uint8_t*)gl_pld_buffer, pld_len);
           udp.endPacket();      
           serial_pkt_sent = 1;
        }
