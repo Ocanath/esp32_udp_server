@@ -23,7 +23,7 @@ void get_console_lines(void)
       }
 
       /*If you get a carriage return, copy through the buffer contents into the double buffer*/
-      if(rchar == '\r')
+      if(rchar == '\r' || rchar == '\n')
       {
         gl_console_cmd.parsed = 0;
         gl_console_cmd.len = charbuf_loc;
