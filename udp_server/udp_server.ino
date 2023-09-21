@@ -144,7 +144,7 @@ void loop() {
         query_response[3] = 'o';
         query_response[4] = ' ';
         WiFi.macAddress((&query_response[5]));
-        udp.beginPacket(udp.remoteIP(), udp.remotePort());
+        udp.beginPacket(udp.remoteIP(), udp.remotePort()+gl_prefs.reply_offset);
         udp.write(query_response,11);
         udp.endPacket();
       }
@@ -175,7 +175,7 @@ void loop() {
        int pld_len = parse_PPP_stream(new_byte, gl_pld_buffer, PAYLOAD_BUFFER_SIZE, gl_unstuffing_buffer, UNSTUFFING_BUFFER_SIZE, &ppp_stuffing_bidx);
        if(pld_len != 0)
        {
-          udp.beginPacket(udp.remoteIP(), udp.remotePort());
+          udp.beginPacket(udp.remoteIP(), udp.remotePort()+gl_prefs.reply_offset);
           udp.write((uint8_t*)gl_pld_buffer, pld_len);
           udp.endPacket();      
           serial_pkt_sent = 1;
@@ -191,7 +191,7 @@ void loop() {
         packet_update_ts = tick;
         if(serial_pkt_sent == 0)
         {
-          udp.beginPacket(udp.remoteIP(), udp.remotePort());
+          udp.beginPacket(udp.remoteIP(), udp.remotePort()+gl_prefs.reply_offset);
           udp.write((uint8_t*)"WAZZUP",6);
           udp.endPacket();          
         }
@@ -221,7 +221,9 @@ void loop() {
           Serial.printf("Not connected to: %s\r\n", gl_prefs.ssid);
         }
         Serial.printf("UDP server on port: %d\r\n", gl_prefs.port);
+        Serial.printf("Server Response Offset: %d\r\n", gl_prefs.reply_offset);
         Serial.printf("IP address is: %s\r\n", WiFi.localIP().toString().c_str());
+		
       }
 
       /*Parse the command to get UDP server access port*/
@@ -289,6 +291,19 @@ void loop() {
         gl_prefs.port = port;
         save = 1;
       }
+	  
+      /*Parse set port command*/
+      cmp = cmd_match((const char *)gl_console_cmd.buf,"setTXoff ");
+      if(cmp > 0)
+      {
+        match = 1;
+    		const char * arg = (const char *)(&gl_console_cmd.buf[cmp]);
+        char * tmp;
+        int offset = strtol(arg, &tmp, 10);
+		    Serial.printf("Setting port offset to: %d\r\n",offset);
+    		gl_prefs.reply_offset = offset;
+		    save = 1;
+	    }	  
 
       /*Parse read ssid and pwd command*/
       cmp = cmd_match((const char *)gl_console_cmd.buf,"readcred");

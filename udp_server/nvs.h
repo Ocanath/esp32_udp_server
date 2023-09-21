@@ -11,6 +11,7 @@ typedef struct nvs_settings_t
   char ssid[WIFI_MAX_SSID_LEN];
   char password[WIFI_MAX_PWD_LEN];
   int port; //udp server forwarding port
+  int reply_offset;	//offset applied to remote port for splitting send and receieve ports. default 0
   int baud;
   uint8_t nbytes_fchk;  //setting can be 0->default 4, 1, 2, or 4
   int nwords_expected; //must be 1 or more, 32bit words
