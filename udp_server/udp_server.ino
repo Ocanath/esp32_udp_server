@@ -21,6 +21,7 @@ void setup() {
 
   /*Do a power on blink pattern*/
   pinMode(2,OUTPUT);
+  pinMode(25,OUTPUT);
   for(int i = 0; i < 4; i++)
   {
     digitalWrite(2,HIGH);
@@ -119,6 +120,8 @@ void loop() {
   uint32_t packet_update_ts = 0;
   uint8_t activate_hose = 0;
   
+  uint8_t prev_switch_state = 0;
+  uint8_t relay_state = 0;
   int ppp_stuffing_bidx = 0;  //arg output/static variable for indexing into the stuffing buffer for ppp unpacking
   while(1)
   {
@@ -159,6 +162,42 @@ void loop() {
         activate_hose = 0;
       }
       
+      uint8_t match = 0;
+      cmp = cmd_match((const char*)udp_pkt_buf, "lightson");
+      if(cmp > 0)
+      {
+        relay_state = 1;
+        digitalWrite(25, relay_state);
+        match = 1;
+      }
+      cmp = cmd_match((const char*)udp_pkt_buf, "lightsoff");
+      if(cmp > 0)
+      {
+        relay_state = 0;
+        digitalWrite(25, relay_state);
+        match = 1;
+      }
+      cmp = cmd_match((const char*)udp_pkt_buf, "lightstat");
+      if(cmp > 0)
+      {
+        uint8_t stat_response[] = {'l','i','g','h','t','s','o','f','f',0};
+        if(relay_state == 1)
+        {
+          stat_response[sizeof(stat_response)-1] = 0;
+          stat_response[sizeof(stat_response)-2] = 0;
+          stat_response[sizeof(stat_response)-3] = 'n';
+        }
+        udp.beginPacket(udp.remoteIP(), udp.remotePort()+gl_prefs.reply_offset);
+        udp.write(stat_response,sizeof(stat_response));
+        udp.endPacket();
+        match = 1;
+      }
+
+      if(match == 0)
+      {
+        printf("%s\r\n",udp_pkt_buf);
+      }
+
       for(int i = 0; i < len; i++)
         udp_pkt_buf[i] = 0;
     }
