@@ -4,7 +4,7 @@
 
 #define WIFI_MAX_SSID_LEN   32    //SSID max length is 32 characters
 #define WIFI_MAX_PWD_LEN    63    //WPA2-PSK key length limit is 63 characters
-
+#define NAME_SIZE 32
 
 typedef struct nvs_settings_t
 {
@@ -15,7 +15,9 @@ typedef struct nvs_settings_t
   int baud;
   uint8_t nbytes_fchk;  //setting can be 0->default 4, 1, 2, or 4
   int nwords_expected; //must be 1 or more, 32bit words
+  char our_name[NAME_SIZE];  //max chars 32
 }nvs_settings_t;
+
 
 extern Preferences preferences;
 extern nvs_settings_t gl_prefs;

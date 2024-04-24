@@ -22,6 +22,7 @@ void setup() {
   /*Do a power on blink pattern*/
   pinMode(2,OUTPUT);
   pinMode(25,OUTPUT);
+  digitalWrite(25,LOW);
   for(int i = 0; i < 4; i++)
   {
     digitalWrite(2,HIGH);
@@ -161,14 +162,34 @@ void loop() {
       {
         activate_hose = 0;
       }
-      
+
       uint8_t match = 0;
+
+      cmp = cmd_match((const char *)udp_pkt_buf, gl_prefs.our_name);
+      if(cmp > 0)
+      {
+        if(udp_pkt_buf[cmp] == ' ')
+        {
+          cmp++;  //skip the space
+          int cpystart = 0;
+          for(int i = cmp; i < sizeof(udp_pkt_buf); i++)
+          {
+            udp_pkt_buf[cpystart] = udp_pkt_buf[i];
+            cpystart++;
+          }
+          for(int i = cpystart; i < sizeof(udp_pkt_buf); i++)
+            udp_pkt_buf[i] = 0;
+        }
+      }
+      
+
       cmp = cmd_match((const char*)udp_pkt_buf, "lightson");
       if(cmp > 0)
       {
         relay_state = 1;
         digitalWrite(25, relay_state);
         match = 1;
+        printf("lightson\n");
       }
       cmp = cmd_match((const char*)udp_pkt_buf, "lightsoff");
       if(cmp > 0)
@@ -176,6 +197,7 @@ void loop() {
         relay_state = 0;
         digitalWrite(25, relay_state);
         match = 1;
+        printf("lightsoff\n");
       }
       cmp = cmd_match((const char*)udp_pkt_buf, "lightstat");
       if(cmp > 0)
@@ -190,12 +212,24 @@ void loop() {
         udp.beginPacket(udp.remoteIP(), udp.remotePort()+gl_prefs.reply_offset);
         udp.write(stat_response,sizeof(stat_response));
         udp.endPacket();
+        printf("lightstat\n");
         match = 1;
       }
 
+      cmp = cmd_match((const char*)udp_pkt_buf, "whoareyou");
+      if(cmp > 0)
+      {
+        int len = strlen(gl_prefs.our_name);
+        udp.beginPacket(udp.remoteIP(), udp.remotePort()+gl_prefs.reply_offset);
+        udp.write((uint8_t*)gl_prefs.our_name, len);
+        udp.endPacket();
+        match = 1;
+      }
+
+
       if(match == 0)
       {
-        printf("%s\r\n",udp_pkt_buf);
+        printf("err: %s unknown\n",udp_pkt_buf);
       }
 
       for(int i = 0; i < len; i++)
@@ -292,6 +326,27 @@ void loop() {
           }
         }
         Serial.printf("Changing ssid to: %s\r\n", gl_prefs.ssid);
+        save = 1;
+      }
+
+      cmp = cmd_match((const char *)gl_console_cmd.buf,"setname ");
+      if(cmp > 0)
+      {
+        match = 1;
+        const char * arg = (const char *)(&gl_console_cmd.buf[cmp]);
+        /*Set the ssid*/
+        for(int i = 0; i < NAME_SIZE; i++)
+        {
+          gl_prefs.our_name[i] = '\0';
+        }
+        for(int i = 0; arg[i] != '\0'; i++)
+        {
+          if(arg[i] != '\r' && arg[i] != '\n')  //copy non carriage return characters
+          {
+            gl_prefs.our_name[i] = arg[i];
+          }
+        }
+        Serial.printf("Changing name to: %s\r\n", gl_prefs.our_name);
         save = 1;
       }
 

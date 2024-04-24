@@ -1,7 +1,16 @@
 #include "nvs.h"
 
 Preferences preferences;
-nvs_settings_t gl_prefs = {0};
+nvs_settings_t gl_prefs = {
+  {0},
+  {0},
+  0,
+  0,
+  460800,
+  0,
+  0,
+  "relayboard-0000"
+};
 
 void init_prefs(Preferences * p, nvs_settings_t * s)
 {
