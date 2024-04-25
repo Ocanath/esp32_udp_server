@@ -10,6 +10,9 @@
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
 
+#define RELAY_PIN 25
+#define SWITCH_PIN 26
+
 
 #define IPV4_ADDR_ANY   0x00000000UL
 
@@ -21,8 +24,9 @@ void setup() {
 
   /*Do a power on blink pattern*/
   pinMode(2,OUTPUT);
-  pinMode(25,OUTPUT);
-  digitalWrite(25,LOW);
+  pinMode(RELAY_PIN, OUTPUT);
+  pinMode(SWITCH_PIN, INPUT);
+  digitalWrite(RELAY_PIN, LOW);
   for(int i = 0; i < 4; i++)
   {
     digitalWrite(2,HIGH);
@@ -124,6 +128,7 @@ void loop() {
   uint8_t prev_switch_state = 0;
   uint8_t relay_state = 0;
   int ppp_stuffing_bidx = 0;  //arg output/static variable for indexing into the stuffing buffer for ppp unpacking
+  uint32_t switch_debounce_ts = 0;
   while(1)
   {
     ArduinoOTA.handle();  //handle OTA updates!
@@ -187,7 +192,7 @@ void loop() {
       if(cmp > 0)
       {
         relay_state = 1;
-        digitalWrite(25, relay_state);
+        digitalWrite(RELAY_PIN, relay_state);
         match = 1;
         printf("lightson\n");
       }
@@ -195,7 +200,7 @@ void loop() {
       if(cmp > 0)
       {
         relay_state = 0;
-        digitalWrite(25, relay_state);
+        digitalWrite(RELAY_PIN, relay_state);
         match = 1;
         printf("lightsoff\n");
       }
@@ -236,6 +241,24 @@ void loop() {
         udp_pkt_buf[i] = 0;
     }
 
+    {
+      uint32_t tick = millis();
+      if((tick - switch_debounce_ts) > 100)
+      {
+        switch_debounce_ts = tick;
+        int stat = digitalRead(SWITCH_PIN);
+        if(stat != prev_switch_state)
+        {
+          if(stat == 0)
+            printf("switch on\n");
+          else
+            printf("switch off\n");
+          relay_state = ~stat & 1;
+          digitalWrite(RELAY_PIN, relay_state);
+        }
+        prev_switch_state = (uint8_t)stat;
+      }
+    }
     /*The following pseudocode should be used for offloading
     32bit fletcher's checksum masked uart packets over UDP, without
     having to write my own baremetal UART for the ESP32. TODO: determine
