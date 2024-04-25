@@ -133,6 +133,11 @@ void loop() {
   uint32_t packet_update_ts = 0;
   uint8_t activate_hose = 0;
   
+  int radar_range = 0;
+  uint8_t radar_acquisition = 0;
+  uint8_t pipe_radar_state = 0;
+  uint8_t console_print_radar = 0;
+
   uint8_t prev_switch_state = 0;
   uint8_t relay_state = 1;
   int ppp_stuffing_bidx = 0;  //arg output/static variable for indexing into the stuffing buffer for ppp unpacking
@@ -176,6 +181,7 @@ void loop() {
       {
         activate_hose = 0;
       }
+      
 
       uint8_t match = 0;
       uint8_t name_match = 0;
@@ -223,6 +229,16 @@ void loop() {
           udp.endPacket();
           match = 1;
           udp_save_triggered = 1;
+        }
+        cmp = cmd_match((const char *)udp_pkt_buf,"piperadar");
+        if(cmp > 0)
+        {
+          pipe_radar_state = 1;
+        }
+        cmp = cmd_match((const char *)udp_pkt_buf,"stopradar");
+        if(cmp > 0)
+        {
+          pipe_radar_state = 0;
         }
       }
       if( (gl_prefs.ignore_general_cmd == 0 && name_match == 0) || name_match != 0)
@@ -331,26 +347,42 @@ void loop() {
           }
 
           int cmp = -1;
-          cmp = strcmp((const char *)gl_unstuffing_buffer,"Range ");
+          cmp = cmd_match((const char *)gl_unstuffing_buffer,"Range ");
           if(cmp > 0)
           {
-            uint8_t postarg_buf[32];
+            uint8_t postarg_buf[32] = {0};
             int postarg_idx = 0;
             for(int i = cmp; (i < ppp_stuffing_bidx - 2); i++)
             {
               postarg_buf[postarg_idx++] = gl_unstuffing_buffer[i];
-              Serial.printf("%c",gl_unstuffing_buffer[i]);
             }
-            postarg_buf[postarg_idx++] = 0;
 
             char * tmp;
-            int range = strtol((const char *)postarg_buf, &tmp, 10);
-            Serial.printf("target range = %d, range str = %s\r\n",range, (const char *)postarg_buf);
+            radar_range = strtol((const char *)postarg_buf, &tmp, 10);
+            if(console_print_radar != 0)
+              Serial.printf("target range = %d\r\n", radar_range);
           }
-          cmp = strcmp((const char *)gl_unstuffing_buffer,"ON");
+          cmp = cmd_match((const char *)gl_unstuffing_buffer,"ON");
           if(cmp > 0)
           {
-            // Serial.printf("Target Acquired\r\n");
+            radar_acquisition = 1;
+            if(console_print_radar != 0)
+              Serial.printf("Target Acquired\r\n");
+          }
+          cmp = cmd_match((const char *)gl_unstuffing_buffer,"OFF");
+          if(cmp > 0)
+          {
+            radar_acquisition = 0;
+            if(console_print_radar != 0)
+              Serial.printf("Target Lost\r\n");
+          }
+
+          if(pipe_radar_state != 0)
+          {
+            int len = sprintf((char*)gl_pld_buffer, "acq=%d, range=%d\n", radar_acquisition, radar_range);
+            udp.beginPacket(udp.remoteIP(), udp.remotePort()+gl_prefs.reply_offset);
+            udp.write(gl_pld_buffer, len);
+            udp.endPacket();
           }
 
           ppp_stuffing_bidx = 0;
@@ -603,7 +635,19 @@ void loop() {
         Serial.printf("Baud is: %d\r\n", gl_prefs.baud);
       }
 
-
+      cmp = cmd_match((const char *)gl_console_cmd.buf, "plotradar");
+      if(cmp > 0)
+      {
+        match = 1;
+        console_print_radar = 1;
+      }
+      cmp = cmd_match((const char *)gl_console_cmd.buf, "stopradar");
+      if(cmp > 0)
+      {
+        match = 1;
+        console_print_radar = 0;
+      }
+      
       /*Parse command to report current baud setting*/
       cmp = cmd_match((const char *)gl_console_cmd.buf,"readrsize\r");
       if(cmp > 0)
