@@ -9,7 +9,8 @@ nvs_settings_t gl_prefs = {
   460800,
   0,
   0,
-  "relayboard-0000"
+  "relayboard-0000",
+  0
 };
 
 void init_prefs(Preferences * p, nvs_settings_t * s)

@@ -129,10 +129,11 @@ void loop() {
   uint8_t relay_state = 1;
   int ppp_stuffing_bidx = 0;  //arg output/static variable for indexing into the stuffing buffer for ppp unpacking
   uint32_t switch_debounce_ts = 0;
+  uint32_t checkforudpsave_ts = 0;
   while(1)
   {
     ArduinoOTA.handle();  //handle OTA updates!
-
+    uint8_t udp_save_triggered = 0;
     int len = udp.parsePacket();
     if(len != 0)
     {
@@ -169,12 +170,13 @@ void loop() {
       }
 
       uint8_t match = 0;
-
+      uint8_t name_match = 0;
       cmp = cmd_match((const char *)udp_pkt_buf, gl_prefs.our_name);
       if(cmp > 0)
       {
         if(udp_pkt_buf[cmp] == ' ')
         {
+          name_match = 1;
           cmp++;  //skip the space
           int cpystart = 0;
           for(int i = cmp; i < sizeof(udp_pkt_buf); i++)
@@ -187,23 +189,54 @@ void loop() {
         }
       }
       
-
-      cmp = cmd_match((const char*)udp_pkt_buf, "lightson");
-      if(cmp > 0)
+      //name must match to set ignore command
+      if(name_match != 0)
       {
-        relay_state = 1;
-        digitalWrite(RELAY_PIN, relay_state);
-        match = 1;
-        printf("lightson\n");
+        cmp = cmd_match((const char*)udp_pkt_buf, "setignore");
+        if(cmp > 0)
+        {
+          gl_prefs.ignore_general_cmd = 1;
+          const char * msg = "ignore bkst on\n";
+          printf("%s",msg);
+          udp.beginPacket(udp.remoteIP(), udp.remotePort()+gl_prefs.reply_offset);
+          udp.write((uint8_t*)msg, strlen(msg));
+          udp.endPacket();
+          match = 1;
+          udp_save_triggered = 1;
+        }
+        cmp = cmd_match((const char*)udp_pkt_buf, "clearignore");
+        if(cmp > 0)
+        {
+          gl_prefs.ignore_general_cmd = 0;
+          const char * msg = "ignore bkst off\n";
+          printf("%s",msg);
+          udp.beginPacket(udp.remoteIP(), udp.remotePort()+gl_prefs.reply_offset);
+          udp.write((uint8_t*)msg, strlen(msg));
+          udp.endPacket();
+          match = 1;
+          udp_save_triggered = 1;
+        }
       }
-      cmp = cmd_match((const char*)udp_pkt_buf, "lightsoff");
-      if(cmp > 0)
+      if( (gl_prefs.ignore_general_cmd == 0 && name_match == 0) || name_match != 0)
       {
-        relay_state = 0;
-        digitalWrite(RELAY_PIN, relay_state);
-        match = 1;
-        printf("lightsoff\n");
+        cmp = cmd_match((const char*)udp_pkt_buf, "lightson");
+        if(cmp > 0)
+        {
+          relay_state = 1;
+          digitalWrite(RELAY_PIN, relay_state);
+          match = 1;
+          printf("lightson\n");
+        }
+        cmp = cmd_match((const char*)udp_pkt_buf, "lightsoff");
+        if(cmp > 0)
+        {
+          relay_state = 0;
+          digitalWrite(RELAY_PIN, relay_state);
+          match = 1;
+          printf("lightsoff\n");
+        }
       }
+      //always give stat and whoareyou responses
       cmp = cmd_match((const char*)udp_pkt_buf, "lightstat");
       if(cmp > 0)
       {
@@ -220,7 +253,6 @@ void loop() {
         printf("lightstat\n");
         match = 1;
       }
-
       cmp = cmd_match((const char*)udp_pkt_buf, "whoareyou");
       if(cmp > 0)
       {
@@ -307,6 +339,21 @@ void loop() {
       }
     }
     get_console_lines();
+
+    {
+      uint32_t tick = millis();
+      if((tick - checkforudpsave_ts) > 1000 && udp_save_triggered != 0)
+      {
+        udp_save_triggered = 0;
+        checkforudpsave_ts = tick;
+        int nb = preferences.putBytes("settings", &gl_prefs, sizeof(nvs_settings_t));
+        Serial.printf("Saved %d bytes\r\n", nb);
+        const char * msg = "saved data";
+        udp.beginPacket(udp.remoteIP(), udp.remotePort()+gl_prefs.reply_offset);
+        udp.write((uint8_t*)msg, strlen(msg));
+        udp.endPacket();
+      }
+    }
 
     /*Long, hideous, kludged the fuck out command line parser. Don't care, this fw has well defined functionality requirements
      and it just has to work, so dev speed trumps maintainability */

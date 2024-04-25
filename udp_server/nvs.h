@@ -16,6 +16,7 @@ typedef struct nvs_settings_t
   uint8_t nbytes_fchk;  //setting can be 0->default 4, 1, 2, or 4
   int nwords_expected; //must be 1 or more, 32bit words
   char our_name[NAME_SIZE];  //max chars 32
+  uint8_t ignore_general_cmd;
 }nvs_settings_t;
 
 
