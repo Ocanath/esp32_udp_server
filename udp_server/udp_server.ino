@@ -28,6 +28,7 @@ enum {PERIOD_CONNECTED = 50, PERIOD_DISCONNECTED = 3000};
 
 WiFiUDP udp;
 
+
 void setup() {
 
   /*Do a power on blink pattern*/
@@ -117,6 +118,63 @@ int cmd_match(const char * in, const char * cmd)
 uint8_t gl_unstuffing_buffer[UNSTUFFING_BUFFER_SIZE] = {0};
 uint8_t gl_pld_buffer[PAYLOAD_BUFFER_SIZE] = {0};
 
+
+void set_target_lightstate(uint8_t state)
+{
+  if(gl_prefs.target_ip[0] == 0)
+    return;
+
+  IPAddress target_ip;
+  if(target_ip.fromString( (const char *)gl_prefs.target_ip)  == false)
+  {
+    Serial.printf("Failed to parse ip\n");
+    return;
+  }
+  Serial.printf("Targeting IP = %s\n", target_ip.toString());
+
+  uint8_t noname = 0;
+  if(gl_prefs.target_name[0] == 0)
+    noname = 1;
+  for(int attempts = 0; attempts < 1; attempts++)
+  {
+    //send to whatever the configuration port is, so it is fixed. Otherwise, a client not bound to this port could redirect light switch commands. 
+    //ensure this device is bound to the same port as the target device.
+    udp.beginPacket(target_ip, gl_prefs.port);  
+    if(noname != 0)
+    {
+      if(state != 0)
+      {
+          int len = sprintf((char*)gl_pld_buffer, "lightson");
+          udp.write(gl_pld_buffer, len);
+          Serial.printf("%s\n", gl_pld_buffer);
+      }
+      else
+      {
+        int len = sprintf((char*)gl_pld_buffer, "lightsoff");
+        udp.write(gl_pld_buffer, len);
+        Serial.printf("%s\n", gl_pld_buffer);
+      }
+    }
+    else
+    {
+      if(state != 0)
+      {
+          int len = sprintf((char*)gl_pld_buffer, "%s lightson", gl_prefs.target_name);
+          udp.write(gl_pld_buffer, len);
+          Serial.printf("%s\n", gl_pld_buffer);
+      }
+      else
+      {
+          int len = sprintf((char*)gl_pld_buffer, "%s lightsoff", gl_prefs.target_name);
+          udp.write(gl_pld_buffer, len);
+          Serial.printf("%s\n", gl_pld_buffer);
+      }      
+    }
+    udp.endPacket();
+  }
+}
+
+
 void loop() {  
 
   Serial.print("Fuck Arduino\r\n");
@@ -135,6 +193,8 @@ void loop() {
   
   int radar_range = 0;
   uint8_t radar_acquisition = 0;
+  uint8_t prev_radar_acquisition = 0;
+  uint32_t bump_target_ts = 0;
   uint8_t pipe_radar_state = 0;
   uint8_t console_print_radar = 0;
 
@@ -206,6 +266,63 @@ void loop() {
       //name must match to set ignore command
       if(name_match != 0)
       {
+        cmp = cmd_match((const char*)udp_pkt_buf, "erase-name");
+        if(cmp > 0)
+        {
+          for(int i = 0; i < sizeof(gl_prefs.target_name); i++)
+            gl_prefs.target_name[i] = 0;
+          match = 1;
+          udp_save_triggered = 1;
+        }
+        cmp = cmd_match((const char*)udp_pkt_buf, "target-name ");
+        if(cmp > 0)
+        {
+          for(int i = 0; i < sizeof(gl_prefs.target_name); i++)
+            gl_prefs.target_name[i] = 0;
+          int nameidx = 0;
+          for(int i = cmp; i < sizeof(udp_pkt_buf) && i < sizeof(gl_prefs.target_name); i++)
+          {
+            gl_prefs.target_name[nameidx++] = udp_pkt_buf[i];
+          }
+          Serial.printf("Setting Target Name to %s\r\n",gl_prefs.target_name);
+          match = 1;
+          udp_save_triggered = 1;
+        }
+        cmp = cmd_match((const char*)udp_pkt_buf, "rtarget-name");
+        if(cmp > 0)
+        {
+          int len = sprintf((char*)gl_pld_buffer, "Target Name=%s", gl_prefs.target_name);
+          udp.beginPacket(udp.remoteIP(), udp.remotePort()+gl_prefs.reply_offset);
+          udp.write(gl_pld_buffer, len);
+          udp.endPacket();
+          match = 1;
+        }
+
+        cmp = cmd_match((const char*)udp_pkt_buf, "target-ip ");
+        if(cmp > 0)
+        {
+          for(int i = 0; i < sizeof(gl_prefs.target_ip); i++)
+            gl_prefs.target_ip[i] = 0;
+          int nameidx = 0;
+          for(int i = cmp; i < sizeof(udp_pkt_buf) && i < sizeof(gl_prefs.target_ip); i++)
+          {
+            gl_prefs.target_ip[nameidx++] = udp_pkt_buf[i];
+          }
+          Serial.printf("Setting Target IP to %s\r\n",gl_prefs.target_ip);
+          match = 1;
+          udp_save_triggered = 1;
+        }
+        cmp = cmd_match((const char*)udp_pkt_buf, "rtarget-ip");
+        if(cmp > 0)
+        {
+          int len = sprintf((char*)gl_pld_buffer, "Target IP=%s", gl_prefs.target_ip);
+          udp.beginPacket(udp.remoteIP(), udp.remotePort()+gl_prefs.reply_offset);
+          udp.write(gl_pld_buffer, len);
+          udp.endPacket();
+          match = 1;
+        }
+
+
         cmp = cmd_match((const char*)udp_pkt_buf, "setignore");
         if(cmp > 0)
         {
@@ -386,10 +503,22 @@ void loop() {
           }
 
           ppp_stuffing_bidx = 0;
+
+
+
+          uint32_t tick = millis();
+          if( (radar_acquisition != prev_radar_acquisition) || ((tick - bump_target_ts) > 10000) )
+          {
+            bump_target_ts = tick;
+            set_target_lightstate(radar_acquisition);
+            prev_radar_acquisition = radar_acquisition;
+          }
+        
+
         }
 
       }
-      
+
       //  int pld_len = parse_PPP_stream(new_byte, gl_pld_buffer, PAYLOAD_BUFFER_SIZE, gl_unstuffing_buffer, UNSTUFFING_BUFFER_SIZE, &ppp_stuffing_bidx);
       //  if(pld_len != 0)
       //  {
@@ -647,6 +776,20 @@ void loop() {
         match = 1;
         console_print_radar = 0;
       }
+
+      cmp = cmd_match((const char*)gl_console_cmd.buf, "target-on");
+      if(cmp > 0)
+      {
+        match = 1;
+        set_target_lightstate(1);
+      }
+      cmp = cmd_match((const char*)gl_console_cmd.buf, "target-off");
+      if(cmp > 0)
+      {
+        match = 1;
+        set_target_lightstate(0);
+      }
+      
       
       /*Parse command to report current baud setting*/
       cmp = cmd_match((const char *)gl_console_cmd.buf,"readrsize\r");

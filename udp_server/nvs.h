@@ -17,6 +17,8 @@ typedef struct nvs_settings_t
   int nwords_expected; //must be 1 or more, 32bit words
   char our_name[NAME_SIZE];  //max chars 32
   uint8_t ignore_general_cmd;
+  char target_name[NAME_SIZE];
+  char target_ip[NAME_SIZE];
 }nvs_settings_t;
 
 
