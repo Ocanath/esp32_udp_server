@@ -11,4 +11,13 @@ Important settings (minimum for functionality):
         setssid: the SSID of the network the ESP32 will continuously try to connect to
         setpwd: the password of the ESP32 wifi network we continuously try to connect to
         setbaud: set the UART baud rate FOR THE UART USED IN THE FORWARDING, NOT THE COMMAND LINE
-        
+
+
+More Info:
+
+    If you're in the IOT branches (relay board and switcher offshoot branches), there's more setup:
+
+    1. Use the minimum necessary commands above for network functionality. I.e. set port, wifi ssid and password.
+    1.1 SET A NAME BESIDES THE DEFAULT: setname "EXAMPLE NAME"
+    2. use chat.py, bind to a port on the same network/subnet. Set your name to NOTHING. Then, you can type commands from the udp command section, such as lightson lightsoff. 
+    3. If your board has a name, you can use that name as a prefix for most commands in the udp command section

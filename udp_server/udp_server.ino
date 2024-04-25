@@ -14,6 +14,14 @@
 #define SWITCH_PIN 26
 
 
+/*
+HARDWARE CONFIG:
+Setport: the port we use (for office, 4593)
+setssid and setpwd for office
+setbaud 115200
+setname to whatever
+*/
+
 #define IPV4_ADDR_ANY   0x00000000UL
 
 enum {PERIOD_CONNECTED = 50, PERIOD_DISCONNECTED = 3000};
@@ -197,7 +205,7 @@ void loop() {
         {
           gl_prefs.ignore_general_cmd = 1;
           const char * msg = "ignore bkst on\n";
-          printf("%s",msg);
+          Serial.printf("%s",msg);
           udp.beginPacket(udp.remoteIP(), udp.remotePort()+gl_prefs.reply_offset);
           udp.write((uint8_t*)msg, strlen(msg));
           udp.endPacket();
@@ -209,7 +217,7 @@ void loop() {
         {
           gl_prefs.ignore_general_cmd = 0;
           const char * msg = "ignore bkst off\n";
-          printf("%s",msg);
+          Serial.printf("%s",msg);
           udp.beginPacket(udp.remoteIP(), udp.remotePort()+gl_prefs.reply_offset);
           udp.write((uint8_t*)msg, strlen(msg));
           udp.endPacket();
@@ -225,7 +233,7 @@ void loop() {
           relay_state = 1;
           digitalWrite(RELAY_PIN, relay_state);
           match = 1;
-          printf("lightson\n");
+          Serial.printf("lightson\n");
         }
         cmp = cmd_match((const char*)udp_pkt_buf, "lightsoff");
         if(cmp > 0)
@@ -233,7 +241,7 @@ void loop() {
           relay_state = 0;
           digitalWrite(RELAY_PIN, relay_state);
           match = 1;
-          printf("lightsoff\n");
+          Serial.printf("lightsoff\n");
         }
       }
       //always give stat and whoareyou responses
@@ -250,7 +258,7 @@ void loop() {
         udp.beginPacket(udp.remoteIP(), udp.remotePort()+gl_prefs.reply_offset);
         udp.write(stat_response,sizeof(stat_response));
         udp.endPacket();
-        printf("lightstat\n");
+        Serial.printf("lightstat\n");
         match = 1;
       }
       cmp = cmd_match((const char*)udp_pkt_buf, "whoareyou");
@@ -266,7 +274,7 @@ void loop() {
 
       if(match == 0)
       {
-        printf("err: %s unknown\n",udp_pkt_buf);
+        Serial.printf("err: %s unknown\n",udp_pkt_buf);
       }
 
       for(int i = 0; i < len; i++)
@@ -282,9 +290,9 @@ void loop() {
         if(stat != prev_switch_state)
         {
           if(stat == 0)
-            printf("switch on\n");
+            Serial.printf("switch on\n");
           else
-            printf("switch off\n");
+            Serial.printf("switch off\n");
           relay_state = ~stat & 1;
           digitalWrite(RELAY_PIN, relay_state);
         }
@@ -299,20 +307,57 @@ void loop() {
     uint8_t serial_pkt_sent = 0;
     while(Serial2.available())
     {
-       uint8_t new_byte = Serial2.read();
+      uint8_t new_byte = Serial2.read();
       if(ppp_stuffing_bidx < sizeof(gl_unstuffing_buffer))
       {
         gl_unstuffing_buffer[ppp_stuffing_bidx++] = new_byte;
+        // printf("%c",new_byte);
       }
       else
       {
         ppp_stuffing_bidx = 0;
       }
-      if(new_byte == '\n' || new_byte == '\r')
+
+
+      if(ppp_stuffing_bidx >=2)
       {
-        for(int i = 0; i < ppp_stuffing_bidx; i++)
-          printf("%c",gl_unstuffing_buffer[i]);
+        if(gl_unstuffing_buffer[ppp_stuffing_bidx-1] == '\n' && gl_unstuffing_buffer[ppp_stuffing_bidx-2] == '\r')
+        {
+         
+          //erase the remaining contents of the buffer. ppp_stuffing_bidx is protected because of the above parsing codes
+          for(int i = ppp_stuffing_bidx; i < sizeof(gl_unstuffing_buffer); i++)
+          {
+            gl_unstuffing_buffer[i] = 0;
+          }
+
+          int cmp = -1;
+          cmp = strcmp((const char *)gl_unstuffing_buffer,"Range ");
+          if(cmp > 0)
+          {
+            uint8_t postarg_buf[32];
+            int postarg_idx = 0;
+            for(int i = cmp; (i < ppp_stuffing_bidx - 2); i++)
+            {
+              postarg_buf[postarg_idx++] = gl_unstuffing_buffer[i];
+              Serial.printf("%c",gl_unstuffing_buffer[i]);
+            }
+            postarg_buf[postarg_idx++] = 0;
+
+            char * tmp;
+            int range = strtol((const char *)postarg_buf, &tmp, 10);
+            Serial.printf("target range = %d, range str = %s\r\n",range, (const char *)postarg_buf);
+          }
+          cmp = strcmp((const char *)gl_unstuffing_buffer,"ON");
+          if(cmp > 0)
+          {
+            // Serial.printf("Target Acquired\r\n");
+          }
+
+          ppp_stuffing_bidx = 0;
+        }
+
       }
+      
       //  int pld_len = parse_PPP_stream(new_byte, gl_pld_buffer, PAYLOAD_BUFFER_SIZE, gl_unstuffing_buffer, UNSTUFFING_BUFFER_SIZE, &ppp_stuffing_bidx);
       //  if(pld_len != 0)
       //  {
