@@ -137,7 +137,7 @@ void loop() {
     if(len != 0)
     {
       int len = udp.read(udp_pkt_buf,255);
-      Serial2.write(udp_pkt_buf,len);
+      // Serial2.write(udp_pkt_buf,len);
       
       /*Simple bkst reply to allow a client to confirm our IP. 
       Sends mac address as a unique identifier, to handle responses from multiple
@@ -268,14 +268,27 @@ void loop() {
     while(Serial2.available())
     {
        uint8_t new_byte = Serial2.read();
-       int pld_len = parse_PPP_stream(new_byte, gl_pld_buffer, PAYLOAD_BUFFER_SIZE, gl_unstuffing_buffer, UNSTUFFING_BUFFER_SIZE, &ppp_stuffing_bidx);
-       if(pld_len != 0)
-       {
-          udp.beginPacket(udp.remoteIP(), udp.remotePort()+gl_prefs.reply_offset);
-          udp.write((uint8_t*)gl_pld_buffer, pld_len);
-          udp.endPacket();      
-          serial_pkt_sent = 1;
-       }
+      if(ppp_stuffing_bidx < sizeof(gl_unstuffing_buffer))
+      {
+        gl_unstuffing_buffer[ppp_stuffing_bidx++] = new_byte;
+      }
+      else
+      {
+        ppp_stuffing_bidx = 0;
+      }
+      if(new_byte == '\n' || new_byte == '\r')
+      {
+        for(int i = 0; i < ppp_stuffing_bidx; i++)
+          printf("%c",gl_unstuffing_buffer[i]);
+      }
+      //  int pld_len = parse_PPP_stream(new_byte, gl_pld_buffer, PAYLOAD_BUFFER_SIZE, gl_unstuffing_buffer, UNSTUFFING_BUFFER_SIZE, &ppp_stuffing_bidx);
+      //  if(pld_len != 0)
+      //  {
+      //     udp.beginPacket(udp.remoteIP(), udp.remotePort()+gl_prefs.reply_offset);
+      //     udp.write((uint8_t*)gl_pld_buffer, pld_len);
+      //     udp.endPacket();      
+      //     serial_pkt_sent = 1;
+      //  }
     }
 
     if(activate_hose != 0)
