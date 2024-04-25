@@ -26,7 +26,7 @@ void setup() {
   pinMode(2,OUTPUT);
   pinMode(RELAY_PIN, OUTPUT);
   pinMode(SWITCH_PIN, INPUT);
-  digitalWrite(RELAY_PIN, LOW);
+  digitalWrite(RELAY_PIN, HIGH);
   for(int i = 0; i < 4; i++)
   {
     digitalWrite(2,HIGH);
@@ -126,7 +126,7 @@ void loop() {
   uint8_t activate_hose = 0;
   
   uint8_t prev_switch_state = 0;
-  uint8_t relay_state = 0;
+  uint8_t relay_state = 1;
   int ppp_stuffing_bidx = 0;  //arg output/static variable for indexing into the stuffing buffer for ppp unpacking
   uint32_t switch_debounce_ts = 0;
   while(1)
