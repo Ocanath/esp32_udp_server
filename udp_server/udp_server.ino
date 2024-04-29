@@ -197,7 +197,7 @@ void loop() {
         {
           gl_prefs.ignore_general_cmd = 1;
           const char * msg = "ignore bkst on\n";
-          printf("%s",msg);
+          Serial.printf("%s",msg);
           udp.beginPacket(udp.remoteIP(), udp.remotePort()+gl_prefs.reply_offset);
           udp.write((uint8_t*)msg, strlen(msg));
           udp.endPacket();
@@ -209,7 +209,7 @@ void loop() {
         {
           gl_prefs.ignore_general_cmd = 0;
           const char * msg = "ignore bkst off\n";
-          printf("%s",msg);
+          Serial.printf("%s",msg);
           udp.beginPacket(udp.remoteIP(), udp.remotePort()+gl_prefs.reply_offset);
           udp.write((uint8_t*)msg, strlen(msg));
           udp.endPacket();
@@ -225,7 +225,7 @@ void loop() {
           relay_state = 1;
           digitalWrite(RELAY_PIN, relay_state);
           match = 1;
-          printf("lightson\n");
+          Serial.printf("lightson\n");
         }
         cmp = cmd_match((const char*)udp_pkt_buf, "lightsoff");
         if(cmp > 0)
@@ -233,7 +233,7 @@ void loop() {
           relay_state = 0;
           digitalWrite(RELAY_PIN, relay_state);
           match = 1;
-          printf("lightsoff\n");
+          Serial.printf("lightsoff\n");
         }
       }
       //always give stat and whoareyou responses
@@ -250,7 +250,7 @@ void loop() {
         udp.beginPacket(udp.remoteIP(), udp.remotePort()+gl_prefs.reply_offset);
         udp.write(stat_response,sizeof(stat_response));
         udp.endPacket();
-        printf("lightstat\n");
+        Serial.printf("lightstat\n");
         match = 1;
       }
       cmp = cmd_match((const char*)udp_pkt_buf, "whoareyou");
@@ -266,7 +266,7 @@ void loop() {
 
       if(match == 0)
       {
-        printf("err: %s unknown\n",udp_pkt_buf);
+        Serial.printf("err: %s unknown\n",udp_pkt_buf);
       }
 
       for(int i = 0; i < len; i++)
@@ -282,9 +282,9 @@ void loop() {
         if(stat != prev_switch_state)
         {
           if(stat == 0)
-            printf("switch on\n");
+            Serial.printf("switch on\n");
           else
-            printf("switch off\n");
+            Serial.printf("switch off\n");
           relay_state = ~stat & 1;
           digitalWrite(RELAY_PIN, relay_state);
         }
