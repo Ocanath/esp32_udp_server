@@ -13,6 +13,7 @@
 #define RELAY_PIN 25
 #define SWITCH_PIN 26
 
+
 /*
 HARDWARE CONFIG:
 Setport: the port we use (for office, 4593)
@@ -27,7 +28,9 @@ enum {PERIOD_CONNECTED = 50, PERIOD_DISCONNECTED = 3000};
 
 WiFiUDP udp;
 
+
 void setup() {
+
   /*Do a power on blink pattern*/
   pinMode(2,OUTPUT);
   pinMode(RELAY_PIN, OUTPUT);
@@ -59,7 +62,14 @@ void setup() {
     if (connected != WL_CONNECTED) {
       Serial.printf("Connection to network %s failed for an unknown reason\r\n", (const char *)gl_prefs.ssid);
     }
+
+	Serial.print("Fuck Arduino\r\n");
+
+	IPAddress server_address((uint32_t)IPV4_ADDR_ANY); //note: may want to change to our local IP, to support multiple devices on the network
+	udp.begin(server_address, gl_prefs.port);
+
   }
+
 
   /*
   Arduino OTA setup
@@ -91,6 +101,7 @@ void setup() {
     });
 
   ArduinoOTA.begin();
+
 }
 
 int cmd_match(const char * in, const char * cmd)
@@ -113,6 +124,7 @@ int cmd_match(const char * in, const char * cmd)
 uint8_t gl_unstuffing_buffer[UNSTUFFING_BUFFER_SIZE] = {0};
 uint8_t gl_pld_buffer[PAYLOAD_BUFFER_SIZE] = {0};
 
+
 void set_target_lightstate(uint8_t state)
 {
   if(gl_prefs.target_ip[0] == 0)
@@ -129,7 +141,7 @@ void set_target_lightstate(uint8_t state)
   uint8_t noname = 0;
   if(gl_prefs.target_name[0] == 0)
     noname = 1;
-  for(int attempts = 0; attempts < 1; attempts++)
+  for(int attempts = 0; attempts < 5; attempts++)
   {
     //send to whatever the configuration port is, so it is fixed. Otherwise, a client not bound to this port could redirect light switch commands. 
     //ensure this device is bound to the same port as the target device.
@@ -139,8 +151,8 @@ void set_target_lightstate(uint8_t state)
       if(state != 0)
       {
           int len = sprintf((char*)gl_pld_buffer, "lightson");
-          udp.write(gl_pld_buffer, len);
-          Serial.printf("%s\n", gl_pld_buffer);
+		udp.write(gl_pld_buffer, len);
+		Serial.printf("%s\n", gl_pld_buffer);
       }
       else
       {
@@ -168,11 +180,8 @@ void set_target_lightstate(uint8_t state)
   }
 }
 
-void loop() {  
-  Serial.print("Fuck Arduino\r\n");
 
-  IPAddress server_address((uint32_t)IPV4_ADDR_ANY); //note: may want to change to our local IP, to support multiple devices on the network
-  udp.begin(server_address, gl_prefs.port);
+
 
   uint32_t blink_ts = 0;
   uint32_t blink_period = PERIOD_DISCONNECTED;
@@ -194,8 +203,10 @@ void loop() {
   int ppp_stuffing_bidx = 0;  //arg output/static variable for indexing into the stuffing buffer for ppp unpacking
   uint32_t switch_debounce_ts = 0;
   uint32_t checkforudpsave_ts = 0;
-  while(1)
-  {
+
+
+void loop() 
+{  
     ArduinoOTA.handle();  //handle OTA updates!
     uint8_t udp_save_triggered = 0;
     int len = udp.parsePacket();
@@ -853,5 +864,4 @@ void loop() {
 
       }
     }
-  }  
-} 
+}
