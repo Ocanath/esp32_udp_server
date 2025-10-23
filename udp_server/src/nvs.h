@@ -1,6 +1,7 @@
 #ifndef NVS_H
 #define NVS_H
-#include "Preferences.h"
+#include <Arduino.h>
+#include <Preferences.h>
 
 #define WIFI_MAX_SSID_LEN   32    //SSID max length is 32 characters
 #define WIFI_MAX_PWD_LEN    63    //WPA2-PSK key length limit is 63 characters

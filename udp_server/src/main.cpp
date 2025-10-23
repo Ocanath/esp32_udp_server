@@ -1,14 +1,13 @@
-#include "WiFi.h"
-#include "WiFiUdp.h"
+#include <Arduino.h>
+#include <WiFi.h>
+#include <ESPmDNS.h>
+#include <WiFiUdp.h>
+#include <ArduinoOTA.h>
 #include "parse_console.h"
 #include "nvs.h"
 #include "checksum.h"
 #include "circ_scan.h"
 #include "PPP.h"
-#include <WiFi.h>
-#include <ESPmDNS.h>
-#include <WiFiUdp.h>
-#include <ArduinoOTA.h>
 
 #define RELAY_PIN 25
 #define SWITCH_PIN 26
@@ -27,6 +26,34 @@ setname to whatever
 enum {PERIOD_CONNECTED = 50, PERIOD_DISCONNECTED = 3000};
 
 WiFiUDP udp;
+IPAddress server_address((uint32_t)IPV4_ADDR_ANY);
+
+// Global state variables
+uint32_t blink_ts = 0;
+uint32_t blink_period = PERIOD_DISCONNECTED;
+uint8_t led_mode = 1;
+
+uint8_t udp_pkt_buf[256] = {0};
+uint32_t packet_update_ts = 0;
+uint8_t activate_hose = 0;
+
+int radar_range = 0;
+uint8_t radar_acquisition = 0;
+uint8_t prev_radar_acquisition = 0;
+uint32_t bump_target_ts = 0;
+uint8_t pipe_radar_state = 0;
+uint8_t console_print_radar = 0;
+
+uint8_t prev_switch_state = 0;
+uint8_t relay_state = 1;
+int ppp_stuffing_bidx = 0;
+uint32_t switch_debounce_ts = 0;
+uint32_t checkforudpsave_ts = 0;
+
+#define UNSTUFFING_BUFFER_SIZE 256
+#define PAYLOAD_BUFFER_SIZE ((UNSTUFFING_BUFFER_SIZE - 2)/2)
+uint8_t gl_unstuffing_buffer[UNSTUFFING_BUFFER_SIZE] = {0};
+uint8_t gl_pld_buffer[PAYLOAD_BUFFER_SIZE] = {0};
 
 
 void setup() {
@@ -65,7 +92,6 @@ void setup() {
 
 	Serial.print("Fuck Arduino\r\n");
 
-	IPAddress server_address((uint32_t)IPV4_ADDR_ANY); //note: may want to change to our local IP, to support multiple devices on the network
 	udp.begin(server_address, gl_prefs.port);
 
   }
@@ -112,18 +138,10 @@ int cmd_match(const char * in, const char * cmd)
     if(in[i] == '\0')
       return -1;
     if(in[i] != cmd[i])
-      return -1;   
+      return -1;
   }
   return i;
 }
-
-//lg_fifo_t gl_cb;
-//uint32_t gl_cb_result[NUM_WORDS_FIFO];  //drawback of the circular buffer copy approach: must make it a double buffer. is pretty wasteful
-#define UNSTUFFING_BUFFER_SIZE 256
-#define PAYLOAD_BUFFER_SIZE ((UNSTUFFING_BUFFER_SIZE - 2)/2)  //max cap based on unstuffing buffer size
-uint8_t gl_unstuffing_buffer[UNSTUFFING_BUFFER_SIZE] = {0};
-uint8_t gl_pld_buffer[PAYLOAD_BUFFER_SIZE] = {0};
-
 
 void set_target_lightstate(uint8_t state)
 {
@@ -179,31 +197,6 @@ void set_target_lightstate(uint8_t state)
     udp.endPacket();
   }
 }
-
-
-
-
-  uint32_t blink_ts = 0;
-  uint32_t blink_period = PERIOD_DISCONNECTED;
-  uint8_t led_mode = 1;
-
-  uint8_t udp_pkt_buf[256] = {0};
-  uint32_t packet_update_ts = 0;
-  uint8_t activate_hose = 0;
-  
-  int radar_range = 0;
-  uint8_t radar_acquisition = 0;
-  uint8_t prev_radar_acquisition = 0;
-  uint32_t bump_target_ts = 0;
-  uint8_t pipe_radar_state = 0;
-  uint8_t console_print_radar = 0;
-
-  uint8_t prev_switch_state = 0;
-  uint8_t relay_state = 1;
-  int ppp_stuffing_bidx = 0;  //arg output/static variable for indexing into the stuffing buffer for ppp unpacking
-  uint32_t switch_debounce_ts = 0;
-  uint32_t checkforudpsave_ts = 0;
-
 
 void loop() 
 {  
